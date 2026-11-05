@@ -1,1 +1,374 @@
+<!DOCTYPE html>  <html lang="hi">  
+<head>  
+  <meta charset="UTF-8">  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+  <title>Company Customer Manager</title>    <style>  
+    * {  
+      box-sizing: border-box;  
+    }  
+  
+    body {  
+      margin: 0;  
+      font-family: Arial, sans-serif;  
+      background: #f1f5f9;  
+      color: #1e293b;  
+    }  
+  
+    header {  
+      background: #1557c0;  
+      color: white;  
+      padding: 20px;  
+      text-align: center;  
+    }  
+  
+    .container {  
+      max-width: 700px;  
+      margin: auto;  
+      padding: 16px;  
+    }  
+  
+    .card {  
+      background: white;  
+      padding: 18px;  
+      border-radius: 12px;  
+      margin-bottom: 18px;  
+      box-shadow: 0 2px 8px #0001;  
+    }  
+  
+    input, button {  
+      width: 100%;  
+      padding: 12px;  
+      margin: 6px 0;  
+      border-radius: 7px;  
+      font-size: 16px;  
+    }  
+  
+    input {  
+      border: 1px solid #cbd5e1;  
+    }  
+  
+    button {  
+      border: none;  
+      background: #1557c0;  
+      color: white;  
+      cursor: pointer;  
+    }  
+  
+    button.delete {  
+      background: #dc2626;  
+    }  
+  
+    .customer {  
+      border: 1px solid #e2e8f0;  
+      padding: 12px;  
+      border-radius: 8px;  
+      margin-top: 10px;  
+    }  
+  
+    .customer h3 {  
+      margin: 5px 0;  
+    }  
+  
+    .small {  
+      color: #64748b;  
+      font-size: 14px;  
+    }  
+  </style>  </head>  <body>  <header>  
+  <h2>Company Customer Manager</h2>  
+  <p>ग्राहक रिकॉर्ड मैनेजमेंट</p>  
+</header>  <div class="container">    <!-- LOGIN -->    <div class="card" id="loginBox">  
+    <h3>कर्मचारी लॉगिन</h3>  <input id="email" type="email"  
+  placeholder="कंपनी ईमेल">  
 
+<input id="password" type="password"  
+  placeholder="पासवर्ड">  
+
+<button id="loginBtn">Login</button>  
+<button id="signupBtn">नया कर्मचारी अकाउंट</button>  
+
+<p id="message"></p>
+
+  </div>    <!-- CUSTOMER APP -->    <div id="app" hidden>  <div class="card">  
+  <h3>नया ग्राहक जोड़ें</h3>  
+
+  <input id="serial" placeholder="सीरियल नंबर">  
+  <input id="name" placeholder="ग्राहक का नाम">  
+  <input id="phone" type="tel" placeholder="मोबाइल नंबर">  
+  <input id="village" placeholder="गांव / मोहल्ला">  
+  <input id="post" placeholder="पोस्ट / थाना">  
+  <input id="district" placeholder="जिला">  
+  <input id="address" placeholder="पूरा पता">  
+
+  <button id="saveBtn">ग्राहक सेव करें</button>  
+  <button id="cancelBtn" hidden>एडिट रद्द करें</button>  
+</div>  
+
+<div class="card">  
+  <h3>ग्राहक खोजें</h3>  
+
+  <input id="search"  
+    placeholder="नाम, मोबाइल या सीरियल नंबर">  
+
+  <p class="small">  
+    कुल ग्राहक: <span id="total">0</span>  
+  </p>  
+
+  <div id="customerList"></div>  
+</div>  
+
+<button id="logoutBtn">Logout</button>
+
+  </div>  </div>  <script type="module">  
+  
+  // Firebase SDK  
+  import { initializeApp }  
+    from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";  
+  
+  import {  
+    getAuth,  
+    createUserWithEmailAndPassword,  
+    signInWithEmailAndPassword,  
+    onAuthStateChanged,  
+    signOut  
+  } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";  
+  
+  import {  
+    getFirestore,  
+    collection,  
+    addDoc,  
+    onSnapshot,  
+    doc,  
+    updateDoc,  
+    deleteDoc  
+  } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";  
+  
+  
+  // STEP: अपनी Firebase जानकारी यहां डालें  
+  const firebaseConfig = {  
+    apiKey: "YOUR_API_KEY",  
+    authDomain: "YOUR_PROJECT.firebaseapp.com",  
+    projectId: "YOUR_PROJECT_ID",  
+    storageBucket: "YOUR_PROJECT.firebasestorage.app",  
+    messagingSenderId: "YOUR_SENDER_ID",  
+    appId: "YOUR_APP_ID"  
+  };  
+  
+  
+  const firebaseApp = initializeApp(firebaseConfig);  
+  const auth = getAuth(firebaseApp);  
+  const db = getFirestore(firebaseApp);  
+  
+  let customers = [];  
+  let editId = null;  
+  let unsubscribe = null;  
+  
+  const $ = id => document.getElementById(id);  
+  
+  
+  // LOGIN  
+  $("loginBtn").onclick = async () => {  
+    try {  
+      await signInWithEmailAndPassword(  
+        auth,  
+        $("email").value,  
+        $("password").value  
+      );  
+    } catch (e) {  
+      $("message").textContent = e.message;  
+    }  
+  };  
+  
+  
+  // CREATE EMPLOYEE ACCOUNT  
+  $("signupBtn").onclick = async () => {  
+    try {  
+      await createUserWithEmailAndPassword(  
+        auth,  
+        $("email").value,  
+        $("password").value  
+      );  
+    } catch (e) {  
+      $("message").textContent = e.message;  
+    }  
+  };  
+  
+  
+  // AUTH STATUS  
+  onAuthStateChanged(auth, user => {  
+    if (user) {  
+      $("loginBox").hidden = true;  
+      $("app").hidden = false;  
+      startCustomerSync();  
+    } else {  
+      $("loginBox").hidden = false;  
+      $("app").hidden = true;  
+  
+      if (unsubscribe) unsubscribe();  
+    }  
+  });  
+  
+  
+  // LIVE CUSTOMER DATA  
+  function startCustomerSync() {  
+    if (unsubscribe) unsubscribe();  
+  
+    unsubscribe = onSnapshot(  
+      collection(db, "customers"),  
+  
+      snapshot => {  
+        customers = snapshot.docs.map(d => ({  
+          id: d.id,  
+          ...d.data()  
+        }));  
+  
+        renderCustomers();  
+      },  
+  
+      error => {  
+        alert("डेटा लोड नहीं हुआ: " + error.message);  
+      }  
+    );  
+  }  
+  
+  
+  // SAVE OR UPDATE CUSTOMER  
+  $("saveBtn").onclick = async () => {  
+  
+    const customer = {  
+      serial: $("serial").value.trim(),  
+      name: $("name").value.trim(),  
+      phone: $("phone").value.trim(),  
+      village: $("village").value.trim(),  
+      post: $("post").value.trim(),  
+      district: $("district").value.trim(),  
+      address: $("address").value.trim(),  
+      updatedAt: new Date().toISOString()  
+    };  
+  
+    if (!customer.name || !customer.phone) {  
+      alert("ग्राहक का नाम और मोबाइल नंबर जरूरी है");  
+      return;  
+    }  
+  
+    try {  
+      if (editId) {  
+        await updateDoc(  
+          doc(db, "customers", editId),  
+          customer  
+        );  
+      } else {  
+        await addDoc(  
+          collection(db, "customers"),  
+          customer  
+        );  
+      }  
+  
+      clearForm();  
+  
+    } catch (e) {  
+      alert("सेव नहीं हुआ: " + e.message);  
+    }  
+  };  
+  
+  
+  // SEARCH AND DISPLAY  
+  $("search").oninput = renderCustomers;  
+  
+  function renderCustomers() {  
+  
+    const query = $("search").value  
+      .trim()  
+      .toLowerCase();  
+  
+    const filtered = customers.filter(c =>  
+      [  
+        c.serial,  
+        c.name,  
+        c.phone,  
+        c.village,  
+        c.post,  
+        c.district,  
+        c.address  
+      ].some(value =>  
+        String(value || "")  
+          .toLowerCase()  
+          .includes(query)  
+      )  
+    );  
+  
+    $("total").textContent = customers.length;  
+  
+    $("customerList").innerHTML = "";  
+  
+    filtered.forEach(c => {  
+  
+      const div = document.createElement("div");  
+      div.className = "customer";  
+  
+      const title = document.createElement("h3");  
+      title.textContent =  
+        (c.serial || "बिना नंबर") + " — " + c.name;  
+  
+      const details = document.createElement("p");  
+      details.textContent =  
+        "मोबाइल: " + c.phone +  
+        " | गांव: " + c.village +  
+        " | पोस्ट: " + c.post +  
+        " | जिला: " + c.district +  
+        " | पता: " + c.address;  
+  
+      const edit = document.createElement("button");  
+      edit.textContent = "Edit";  
+  
+      edit.onclick = () => {  
+        editId = c.id;  
+  
+        $("serial").value = c.serial || "";  
+        $("name").value = c.name || "";  
+        $("phone").value = c.phone || "";  
+        $("village").value = c.village || "";  
+        $("post").value = c.post || "";  
+        $("district").value = c.district || "";  
+        $("address").value = c.address || "";  
+  
+        $("saveBtn").textContent = "Update Customer";  
+        $("cancelBtn").hidden = false;  
+  
+        window.scrollTo(0, 0);  
+      };  
+  
+      const del = document.createElement("button");  
+      del.textContent = "Delete";  
+      del.className = "delete";  
+  
+      del.onclick = async () => {  
+        if (confirm("क्या यह ग्राहक डिलीट करना चाहते हैं?")) {  
+          await deleteDoc(doc(db, "customers", c.id));  
+        }  
+      };  
+  
+      div.append(title, details, edit, del);  
+      $("customerList").appendChild(div);  
+    });  
+  }  
+  
+  
+  function clearForm() {  
+    [  
+      "serial", "name", "phone", "village",  
+      "post", "district", "address"  
+    ].forEach(id => $(id).value = "");  
+  
+    editId = null;  
+    $("saveBtn").textContent = "ग्राहक सेव करें";  
+    $("cancelBtn").hidden = true;  
+  }  
+  
+  $("cancelBtn").onclick = clearForm;  
+  
+  
+  // LOGOUT  
+  $("logoutBtn").onclick = () => signOut(auth);  
+  
+</script>  </body>  
+</html>  
